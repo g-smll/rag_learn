@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向量数据展示系统</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .data-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        .table th {
+            background-color: #343a40;
+            color: white;
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+        .document-cell {
+            max-width: 400px;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .document-content {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        .truncated-text {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .fulltext-tooltip {
+            visibility: hidden;
+            width: 500px;
+            max-width: 80vw;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #fff;
+            color: #333;
+            text-align: left;
+            border-radius: 4px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1000;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+            white-space: normal;
+            word-wrap: break-word;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .document-content:hover .fulltext-tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        .metadata-cell {
+            max-width: 300px;
+        }
+        .vector-cell {
+            width: 35%;
+        }
+        .vector-details {
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .vector-details summary {
+            outline: none;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        .vector-details .vector-content {
+            max-height: 300px;
+            overflow: auto;
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .vector-details pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.85em;
+            color: #495057;
+            line-height: 1.4;
+            font-family: 'Courier New', monospace;
+        }
+        .nowrap-cell {
+            white-space: nowrap;
+            min-width: 80px;
+        }
+        .page-title {
+            color: #343a40;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="data-container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="page-title mb-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-database me-2" viewBox="0 0 16 16">
+                        <path d="M8 1c-1.573 0-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4s.875 1.755 1.904 2.223C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777C13.125 5.755 14 5.007 14 4s-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1zm0 7c-1.573 0-3.022.289-4.096.777C2.875 9.245 2 9.993 2 11s.875 1.755 1.904 2.223C4.978 13.711 6.427 14 8 14s3.022-.289 4.096-.777C13.125 12.755 14 12.007 14 11s-.875-1.755-1.904-2.223C11.022 8.289 9.573 8 8 8zm0 7c-1.573 0-3.022.289-4.096.777C2.875 16.245 2 16.993 2 18s.875 1.755 1.904 2.223C4.978 20.711 6.427 21 8 21s3.022-.289 4.096-.777C13.125 19.755 14 19.007 14 18s-.875-1.755-1.904-2.223C11.022 15.289 9.573 15 8 15z"/>
+                    </svg>
+                    向量数据展示
+                </h2>
+                <div class="d-flex align-items-center">
+                    <div class="input-group me-3" style="width: 300px;">
+                        <input type="text" id="searchInput" class="form-control" placeholder="输入查询内容">
+                        <button id="searchBtn" class="btn btn-primary">
+                            <i class="bi bi-search"></i> 查询
+                        </button>
+                    </div>
+                    <button id="vectorizeBtn" class="btn btn-primary me-2">
+                        <i class="bi bi-arrow-repeat"></i> 转为向量存储
+                    </button>
+                    <button id="deleteAllBtn" class="btn btn-danger">
+                        <i class="bi bi-trash-fill"></i> 删除全部数据
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th width="10%">ID</th>
+                            <th width="40%">文档内容</th>
+                            <th width="25%">元数据</th>
+                            <th width="15%">向量预览</th>
+                            <th width="10%">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if data.ids|length > 0 %}
+                            {% for i in range(data.ids|length) %}
+                            <tr>
+                                <td width="8%"><code>{{ data.ids[i] }}</code></td>
+                                <td width="32%" class="document-cell" style="vertical-align: top;">
+                                    <div class="document-content">
+                                        <span class="">
+                                            {% set display_chars = 600 %}
+                                            {% set tooltip_threshold = 800 %}
+                                            {% if data.documents[i]|length > display_chars %}
+                                                {{ data.documents[i][:display_chars] }}...
+                                            {% else %}
+                                                {{ data.documents[i] }}
+                                            {% endif %}
+                                        </span>
+                                        {% if data.documents[i]|length > tooltip_threshold %}
+                                        <div class="fulltext-tooltip">{{ data.documents[i] }}</div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td width="20%" class="metadata-cell">
+                                    {% if data.metadatas and data.metadatas[i] %}
+                                        <div class="metadata-content">
+                                            {% for key, value in data.metadatas[i].items() %}
+                                                <div><strong>{{ key }}:</strong> {{ value }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">无元数据</span>
+                                    {% endif %}
+                                </td>
+                                <td width="35%" class="vector-cell">
+                                    {% if data.embeddings and data.embeddings[i] %}
+                                    <details class="vector-details" open>
+                                        <summary>
+                                            <span class="badge bg-info">
+                                                {{ data.embeddings[i]|length }}维向量
+                                            </span>
+                                        </summary>
+                                        <div class="vector-content">
+                                            <pre>{{ data.embeddings[i]|join(', ') }}</pre>
+                                        </div>
+                                    </details>
+                                    {% else %}
+                                        <span class="text-muted">无向量</span>
+                                    {% endif %}
+                                </td>
+                                <td width="8%" class="text-center nowrap-cell">
+                                    <button class="btn btn-sm btn-danger delete-btn" data-id="{{ data.ids[i] }}">
+                                        <i class="bi bi-trash"></i> 删除
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4">暂无数据</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if total_pages > 1 %}
+            <nav aria-label="数据分页">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                        <a class="page-link" href="/data?page={{ page - 1 }}" aria-label="上一页">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p >= page - 2 and p <= page + 2 %}
+                        <li class="page-item {% if p == page %}active{% endif %}">
+                            <a class="page-link" href="/data?page={{ p }}">{{ p }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="/data?page={{ page + 1 }}" aria-label="下一页">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 查询功能
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                alert('请输入查询内容');
+                return;
+            }
+
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 查询中...';
+            
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: query, limit: 5 })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('网络响应不正常');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.results && data.results.length > 0) {
+                    // 显示查询结果
+                    const tbody = document.querySelector('tbody');
+                    tbody.innerHTML = '';
+                    
+                    data.results.forEach(result => {
+                        const similarityScore = (1 - (result.distance || 0)).toFixed(4);
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td width="8%"><code>${result.id}</code></td>
+                            <td width="30%" class="document-cell">
+                                <div class="document-content" title="${result.document}">
+                                    ${result.document.length > 200 ? result.document.substring(0, 200) + '...' : result.document}
+                                </div>
+                            </td>
+                            <td width="15%" class="metadata-cell">
+                                ${result.metadata ? Object.entries(result.metadata).map(([key, value]) => 
+                                    `<div><strong>${key}:</strong> ${value}</div>`
+                                ).join('') : '<span class="text-muted">无元数据</span>'}
+                            </td>
+                            <td width="10%" class="text-center">
+                                <span class="badge bg-success" title="相似度分数">${similarityScore}</span>
+                            </td>
+                            <td width="30%" class="vector-cell">
+                                ${result.embedding ? `
+                                <details class="vector-details">
+                                    <summary>
+                                        <span class="badge bg-info">
+                                            ${result.embedding.length}维向量
+                                        </span>
+                                    </summary>
+                                    <div class="vector-content">
+                                        <pre>${result.embedding.slice(0, 10).join(', ')}...</pre>
+                                    </div>
+                                </details>
+                                ` : '<span class="text-muted">无向量</span>'}
+                            </td>
+                            <td width="7%" class="text-center nowrap-cell">
+                                <button class="btn btn-sm btn-danger delete-btn" data-id="${result.id}">
+                                    <i class="bi bi-trash"></i> 删除
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    alert(data.message || '未找到匹配结果');
+                }
+            })
+            .catch(error => {
+                alert('查询失败: ' + error);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-search"></i> 查询';
+            });
+        });
+        // 添加交互效果
+        document.addEventListener('DOMContentLoaded', function() {
+            // 为表格行添加悬停效果
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                row.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#f1f1f1';
+                });
+                row.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = '';
+                });
+            });
+
+            // 单条删除功能
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    if (confirm('确定要删除这条数据吗？此操作不可恢复！')) {
+                        deleteData([id]);
+                    }
+                });
+            });
+
+            // 全部删除功能
+            document.getElementById('deleteAllBtn').addEventListener('click', function() {
+                if (confirm('确定要删除全部数据吗？此操作不可恢复！')) {
+                    deleteData('ALL');
+                }
+            });
+
+            // 转为向量存储功能
+            document.getElementById('vectorizeBtn').addEventListener('click', function() {
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
+                
+                fetch('/vectorize_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('转为向量存储成功');
+                        location.reload(); // 刷新页面
+                    } else {
+                        alert('处理失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('请求失败: ' + error);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> 转为向量存储';
+                });
+            });
+
+            // 删除数据函数
+            function deleteData(ids) {
+                fetch('/delete_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ ids: ids })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('删除成功');
+                        location.reload(); // 刷新页面
+                    } else {
+                        alert('删除失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('删除请求失败: ' + error);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

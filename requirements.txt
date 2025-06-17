@@ -1,0 +1,8 @@
+pdfminer.six
+nltk
+chromadb
+langchain
+langchain-openai
+langchain-chroma
+Flask==2.3.2
+python-dotenv==1.0.0
